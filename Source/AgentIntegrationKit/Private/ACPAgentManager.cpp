@@ -387,6 +387,25 @@ static void ApplyCodexExternalMcpIsolation(FACPAgentConfig& InOutLaunchConfig)
 	UE_LOG(LogAgentIntegrationKit, Log,
 		TEXT("ACPAgentManager: Codex MCP isolation applied, disabled %d external MCP server(s) from %s"),
 		ServerNamesToDisable.Num(), *CodexConfigPath);
+
+	// Ensure Unreal MCP is always present for Codex launches, even if ACP session/new
+	// mcpServers injection is ignored or delayed by the target runtime.
+	if (FMCPServer::Get().IsRunning())
+	{
+		const FString UnrealServerSegment = BuildTomlDottedSegment(TEXT("unreal-editor"));
+		const FString UnrealMcpUrl = FString::Printf(TEXT("http://127.0.0.1:%d/mcp"), FMCPServer::Get().GetPort());
+
+		InOutLaunchConfig.Arguments.Add(TEXT("-c"));
+		InOutLaunchConfig.Arguments.Add(FString::Printf(TEXT("mcp_servers.%s.url=\"%s\""), *UnrealServerSegment, *UnrealMcpUrl));
+		InOutLaunchConfig.Arguments.Add(TEXT("-c"));
+		InOutLaunchConfig.Arguments.Add(FString::Printf(TEXT("mcp_servers.%s.enabled=true"), *UnrealServerSegment));
+		InOutLaunchConfig.Arguments.Add(TEXT("-c"));
+		InOutLaunchConfig.Arguments.Add(FString::Printf(TEXT("mcp_servers.%s.tool_timeout_sec=120"), *UnrealServerSegment));
+
+		UE_LOG(LogAgentIntegrationKit, Log,
+			TEXT("ACPAgentManager: Codex launch override added Unreal MCP server: %s"),
+			*UnrealMcpUrl);
+	}
 }
 
 static FString QuoteForShellDouble(const FString& Value)
